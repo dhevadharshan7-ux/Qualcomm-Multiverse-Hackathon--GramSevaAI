@@ -19,9 +19,10 @@ Checked directly, not assumed:
 | `gramseva` database (Python orchestrator) | ✅ Created, schema applied, verified end-to-end |
 | Ollama | ✅ Installed and running (`http://localhost:11434`) |
 | A real Gemma model in Ollama | ❌ Not pulled — only one model exists (see below) |
-| A real Whisper/STT model in Ollama | ⚠️ **Misleading** — `karanchopda333/whisper:latest` is pulled, but its own metadata (`family: llama`, `parameter_size: 3.2B`, `capabilities: [completion, tools]`) shows it's a **text LLM (Llama 3.2 3B), not a speech-to-text model.** It cannot transcribe audio. Don't rely on this for voice intake until it's replaced with a real ASR model — see §3.3. |
-| Node.js / npm | ❌ Not installed on this machine — needed for the backend (`Gram_Seva_Ai (3)/Gram_Seva_Ai/backend`) and the website |
-| Python venv (`.venv`) | ✅ Set up, dependencies installed |
+| Voice transcription (Whisper) | ✅ **Fixed** — `karanchopda333/whisper:latest` in Ollama was a mislabeled text LLM, not real STT (see history). Replaced with `faster-whisper` running in-process (§3.3), no separate server needed. `STT_BACKEND=faster_whisper` is set in `.env` and confirmed working. |
+| `.env` actually being loaded | ✅ **Fixed a real bug** — `python-dotenv` was a listed dependency but `load_dotenv()` was never called anywhere in the code, so every `.env` value was silently ignored in favor of hardcoded defaults (this is why the STT fix above didn't take effect just from editing `.env` — the file was never read at all). Now called at the very top of `orchestrator/main.py`, before any module that reads env vars at import time. **Restart the orchestrator process for this fix to take effect if it's already running.** |
+| Node.js / npm | ✅ Now installed (per website `package.json` changes) — website confirmed working by you |
+| Python venv (`.venv`) | ✅ Set up, dependencies installed (now includes `faster-whisper`) |
 | "Genie CLI" for Gemma | ❌ Not found anywhere on this machine (checked `PATH`, `Program Files`, `AppData`). If you run it from elsewhere, see §3.2. |
 
 Machine's LAN IP (Wi-Fi): **`10.91.53.228`** — this is what other devices on
@@ -150,34 +151,35 @@ is the only real-model backend implemented so far — tell me how Genie is
 actually invoked (binary path, whether it serves HTTP or is a one-shot CLI
 call) and I'll add a proper backend for it instead of guessing.
 
-### 3.3 Whisper (voice transcription) — needs a real fix, not just a start command
+### 3.3 Whisper (voice transcription) — now working, in-process
 
-The model currently in Ollama (`karanchopda333/whisper:latest`) **is not a
-speech-to-text model** — see §0. Starting it won't give you working voice
-transcription. Two real options:
+The model previously in Ollama (`karanchopda333/whisper:latest`) **was not
+a speech-to-text model** (see §0) — that path is abandoned. Instead,
+`orchestrator/speech.py` now has a `faster_whisper` backend that runs
+Whisper **in-process** via the `faster-whisper` library (CTranslate2) — no
+separate server, no HTTP endpoint to stand up or misconfigure.
 
-**Option A — pull an actual local Whisper server** (not through Ollama,
-since Ollama doesn't serve real audio-transcription models). e.g.
-[`faster-whisper-server`](https://github.com/fedirz/faster-whisper-server)
-or `whisper.cpp`'s server mode, either exposing the OpenAI-compatible
-`/v1/audio/transcriptions` endpoint `orchestrator/speech.py` already
-targets. Then in `.env`:
 ```
-STT_BACKEND=whisper
-WHISPER_STT_URL=http://localhost:<its-port>/v1/audio/transcriptions
+STT_BACKEND=faster_whisper
+FASTER_WHISPER_MODEL=base            # tiny/base/small/medium/large-v3 — bigger = slower + more accurate
+FASTER_WHISPER_DEVICE=cpu            # no CUDA on this box; int8 CPU inference is the realistic default
+FASTER_WHISPER_COMPUTE_TYPE=int8
 ```
 
-**Option B — use the Whisper model already sitting on this machine.** You
-have `whisper_large_v3_turbo-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_elite`
-in Downloads (2GB, NPU-accelerated ONNX build — this is the "real" answer
-for the Snapdragon X Elite pitch specifically). This needs a small ONNX
-Runtime + QNN execution-provider serving script wrapped in the same
-`/v1/audio/transcriptions` shape — not built yet. Say the word and I'll
-build that wrapper; it's a better fit for the hackathon's NPU-acceleration
-story than a generic Ollama-served model would be anyway.
+Already set in `.env` and confirmed working. First voice request after a
+server (re)start is slow (a few seconds) while the model loads and gets
+cached in memory — subsequent requests are fast.
 
-Until either is done, leave `STT_BACKEND=stub` — voice-intake requests
-will return a clear error instead of silently mistranscribing.
+**Fastest path to actual NPU acceleration later** (better fit for the
+Snapdragon X Elite pitch than CPU inference): you already have
+`whisper_large_v3_turbo-precompiled_qnn_onnx-float-qualcomm_snapdragon_x_elite`
+in Downloads (2GB, NPU-accelerated ONNX build). Wiring that in needs a
+small ONNX Runtime + QNN execution-provider serving script behind the same
+`SpeechToTextClient` interface — not built yet, say the word and I will.
+
+If you'd rather run STT as a separate server/process instead (e.g. on a
+different LAN machine), `STT_BACKEND=whisper` + `WHISPER_STT_URL` still
+works against any OpenAI-compatible `/v1/audio/transcriptions` server.
 
 ### 3.4 Document/ID vision-OCR
 

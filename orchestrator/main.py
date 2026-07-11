@@ -7,6 +7,15 @@ entirely on the Snapdragon X Elite AI PC with zero internet dependency.
 import logging
 import uuid
 
+from dotenv import load_dotenv
+
+# Must run before any project-local import below — several modules
+# (shared.db, orchestrator.routing) read env vars as module-level constants
+# at import time, so .env has to be loaded first or those reads silently
+# fall back to hardcoded defaults no matter what .env says. This was a real
+# bug: .env was never actually being loaded anywhere in the codebase.
+load_dotenv()
+
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
