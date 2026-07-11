@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gramseva-postgres
+    environment:
+      POSTGRES_USER: gramseva
+      POSTGRES_PASSWORD: gramseva
+      POSTGRES_DB: gramseva
+    ports:
+      - "5432:5432"
+    volumes:
+      - gramseva_pgdata:/var/lib/postgresql/data
+      - ../shared/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gramseva -d gramseva"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  gramseva_pgdata:

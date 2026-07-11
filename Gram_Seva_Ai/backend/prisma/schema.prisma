@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Panchayat {
+  id        Int       @id @default(autoincrement())
+  name      String
+  district  String
+  state     String
+  address   String?
+  createdAt DateTime  @default(now())
+  officers  Officer[]
+  villages  Village[]
+}
+
+model Village {
+  id          Int       @id @default(autoincrement())
+  name        String
+  panchayatId Int
+  createdAt   DateTime  @default(now())
+  citizens    Citizen[]
+  panchayat   Panchayat @relation(fields: [panchayatId], references: [id])
+}
+
+model Officer {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String?   @unique
+  phone        String?
+  designation  String
+  passwordHash String?
+  panchayatId  Int
+  createdAt    DateTime  @default(now())
+  panchayat    Panchayat @relation(fields: [panchayatId], references: [id])
+}
+
+model Citizen {
+  id           Int           @id @default(autoincrement())
+  aadhaar      String        @unique
+  fullName     String
+  age          Int
+  gender       Gender
+  phone        String?
+  occupation   String
+  annualIncome Float
+  caste        String?
+  address      String?
+  villageId    Int
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  applications Application[]
+  village      Village       @relation(fields: [villageId], references: [id])
+  documents    Document[]
+}
+
+model Scheme {
+  id           Int               @id @default(autoincrement())
+  schemeName   String            @unique
+  description  String
+  // benefit/department are structured detail for schemes an officer has
+  // hand-configured (with eligibility rules attached). The bulk-imported
+  // central-government catalog (prisma/data/schemes.csv, sourced from the
+  // team's Firebase "schemes" collection) doesn't carry this granularity —
+  // only schemeName/description/schemeUrl — so both are optional.
+  benefit      String?
+  department   String?
+  schemeUrl    String?
+  createdAt    DateTime          @default(now())
+  applications Application[]
+  rules        EligibilityRule[]
+}
+
+model EligibilityRule {
+  id         Int     @id @default(autoincrement())
+  schemeId   Int
+  minAge     Int?
+  maxAge     Int?
+  maxIncome  Float?
+  occupation String?
+  caste      String?
+  gender     Gender?
+  scheme     Scheme  @relation(fields: [schemeId], references: [id])
+}
+
+model Application {
+  id          Int               @id @default(autoincrement())
+  citizenId   Int
+  schemeId    Int
+  status      ApplicationStatus @default(PENDING)
+  remarks     String?
+  submittedAt DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  citizen     Citizen           @relation(fields: [citizenId], references: [id])
+  scheme      Scheme            @relation(fields: [schemeId], references: [id])
+}
+
+model Document {
+  id           Int      @id @default(autoincrement())
+  citizenId    Int
+  documentType String
+  fileUrl      String
+  uploadedAt   DateTime @default(now())
+  citizen      Citizen  @relation(fields: [citizenId], references: [id])
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  actor     String
+  entity    String?
+  entityId  Int?
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model AISession {
+  id        Int      @id @default(autoincrement())
+  sessionId String   @unique
+  model     String
+  prompt    String
+  response  String
+  createdAt DateTime @default(now())
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum ApplicationStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}

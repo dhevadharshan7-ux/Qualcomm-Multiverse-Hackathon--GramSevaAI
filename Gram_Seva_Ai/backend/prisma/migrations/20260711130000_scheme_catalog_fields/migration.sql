@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Scheme" ADD COLUMN "schemeUrl" TEXT;
+ALTER TABLE "Scheme" ALTER COLUMN "benefit" DROP NOT NULL;
+ALTER TABLE "Scheme" ALTER COLUMN "department" DROP NOT NULL;

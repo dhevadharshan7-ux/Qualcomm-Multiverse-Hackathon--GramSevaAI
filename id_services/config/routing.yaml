@@ -1,0 +1,8 @@
+# id_type -> facilitation office (CONTRACT.md-style: config-driven, not
+# hardcoded). These are the human offices a citizen still has to go
+# through — this system prepares the request, it never submits directly
+# to UIDAI/NSDL/Parivahan.
+aadhaar: Common Service Centre (UIDAI Enrolment Partner)
+pan: NSDL/UTIITSL PAN Facilitation Centre
+driving_license: RTO / Parivahan Sewa Kendra
+other: Panchayat Office — General Desk

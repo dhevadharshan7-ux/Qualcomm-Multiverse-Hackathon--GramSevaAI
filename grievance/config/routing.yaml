@@ -1,0 +1,10 @@
+# category -> responsible department (CONTRACT.md §4).
+# Config-driven on purpose: departments are a panchayat-level policy choice,
+# not something to hardcode in Python.
+streetlight: Public Works Department
+water: Water Supply Department
+road_damage: Public Works Department
+electricity: Electricity Department
+sanitation: Sanitation Department
+corruption: Vigilance Cell
+other: General Administration
