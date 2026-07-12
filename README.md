@@ -1,99 +1,138 @@
-# Gram Seva AI
+<div align="center">
 
-Offline-first, voice-driven platform for Indian village government offices
-(gram panchayats). Built for the Snapdragon Multiverse Hackathon (Qualcomm
-Bengaluru, Jul 11–12 2026).
+# 🏛️ Gram Seva AI
 
-Runs across four device tiers:
+### Voice-first, offline-first AI for India's Gram Panchayats
 
-1. **Snapdragon X Elite AI PC (Copilot+)** — compute hub: this repo's
-   Python orchestrator. Local FastAPI server, Gemma4-based intent
-   classification, offline Whisper STT, a document/ID vision-OCR model,
-   local Postgres as system of record.
-2. **OnePlus 15 mobile / the website** — citizen/field-agent interfaces
-   (voice capture, forms, status checks). Talk to the orchestrator's API
-   directly for voice/grievance/ID-request flows, and to Firebase for
-   cross-device live status (see Architecture below).
-3. **Arduino UNO Q** — sensing layer (water pump / streetlight state).
-   Simulated here behind the same interface a real board will use.
-4. **Qualcomm AI Cloud 100** — optional escalation + opportunistic sync.
-   Never a hard dependency; every core function works with zero internet.
+**Built at the Snapdragon Multiverse Hackathon** · Qualcomm, Bengaluru · Jul 11–12, 2026
 
-See [`shared/CONTRACT.md`](shared/CONTRACT.md) for the orchestrator's API
-contract, [`shared/DATA_GOVERNANCE.md`](shared/DATA_GOVERNANCE.md) for the
-Responsible AI / data-security posture (read that one before treating this
-as more than a hackathon demo), and **[`RUNBOOK.md`](RUNBOOK.md) for
-step-by-step startup of every server** — it's kept current with what's
-actually verified working on the dev machine, more so than this file.
+*In collaboration with Qualcomm Snapdragon, Sarvam AI, and OnePlus*
 
-Beyond voice grievance/ID-request intake, the orchestrator also serves a
-**scheme/policy chatbot** (`POST /chat`, `POST /chat/voice`) — grounded in
-the real scheme catalog (not the model's pretrained guesses), with a
-code-level topic gate that refuses off-topic questions before they ever
-reach a model. See `orchestrator/scheme_chat.py`.
+[![Watch the Demo](https://img.shields.io/badge/▶-Watch%20the%20Demo-red?style=for-the-badge)](https://youtu.be/oFbAL97vr0U)
 
-## Architecture — two backends, one bridge
+**Team GramSeva AI** — presented by **XDOSO Tech Labs LLP**
 
-This repo grew two backends during the hackathon, each owning a different
-domain, joined by Firebase:
+</div>
 
-- **Python orchestrator** (`orchestrator/`, `grievance/`, `id_services/`,
-  `dal/`) — owns voice intake, intent classification, grievances, Arduino
-  sensor cross-checks, and Aadhaar/PAN/Driving-Licence update *requests*.
-  This is what the website's voice/grievance/ID-request flows call
-  directly (needs low-latency access to the local models).
-- **Node/Express backend** (`Gram_Seva_Ai/backend/`) — owns citizens,
-  schemes, eligibility, applications, and documents (Prisma/Postgres).
-  Bridges to Firebase Firestore: clients write to `gram_seva_requests`,
-  a listener processes them into Postgres and writes `gram_seva_responses`;
-  a 60-second job mirrors current Postgres state (citizens, applications,
-  **and** the Python side's grievances) into `gram_seva_live` for
-  cross-device read views. See `Gram_Seva_Ai/backend/SECURITY_CHANGES.md`
-  for what auth/security hardening was applied to it.
-- **`react_firebase_integration.md`** (repo root) is the source-of-truth
-  spec for the Firestore bridge shape — both the website and any other
-  client should follow it exactly.
+---
 
-Both backends share the **same physical Postgres instance**, different
-tables (see table-ownership note in `shared/CONTRACT.md` §5) — not two
-independent databases.
+## The Problem
 
-## Repo layout
+Village government offices (Gram Panchayats) serve millions of citizens who often can't read, don't have reliable internet, and don't have time to fill out forms. Grievances go unheard. Scheme information stays out of reach. And every digital-governance tool built for a data centre breaks the moment the network does.
+
+## The Idea
+
+**Gram Seva AI puts the entire office in a citizen's voice.**
+
+A villager speaks — in their own language, over WhatsApp or a shared kiosk — and the system files a grievance, checks a scheme's eligibility, or requests an ID update. No app literacy required. No internet required. Everything runs **on-prem, offline, on-device**, powered by **Gemma 4B** running locally, with an in-house orchestration engine we call **AetherRoute** deciding what happens next.
+
+This isn't a hackathon toy — it's designed as a real deployment path for India's **Digital Governance (DigiGov)** initiatives, built on Qualcomm Snapdragon compute from day one.
+
+---
+
+## How It Works
 
 ```
-orchestrator/     FastAPI app: intent classification, voice (Whisper), routing
+Citizen speaks (WhatsApp / App / Kiosk / Website)
+            │
+            ▼
+   n8n automation layer  ──► WhatsApp-native intake, zero app install needed
+            │
+            ▼
+   AetherRoute Orchestrator (Snapdragon X Elite AI PC)
+   ├─ Whisper STT (offline)         → converts speech to text, on-device
+   ├─ Gemma 4B (on-prem)            → intent classification, no cloud call
+   ├─ Vision OCR                    → reads ID documents, masks PII before it's ever saved
+   └─ Local Postgres                → system of record, works with zero internet
+            │
+            ▼
+   Grievance Platform / Scheme Chatbot / ID-Request Intake
+            │
+            ▼
+   Arduino UNO Q (sensing layer) ──► cross-checks water/streetlight complaints against real sensor state
+            │
+            ▼
+   Qualcomm AI Cloud 100 (optional) ──► escalation & sync when connectivity exists — never required
+```
+
+**The core design principle:** every essential function works with the network cable pulled out. The cloud is an upgrade, never a dependency.
+
+---
+
+## What It Actually Does
+
+| Capability | How it works |
+|---|---|
+| 🗣️ **Voice grievance filing** | Citizen describes a problem in natural speech; the system classifies intent, files the grievance, and routes it to the right department — all offline. |
+| 📡 **Sensor-verified complaints** | Water and streetlight complaints are cross-checked live against real sensor data (Arduino UNO Q), so a complaint can be marked *verified* or *disputed* automatically, not left to guesswork. |
+| 🪪 **ID update requests** | Citizens can request an Aadhaar / PAN / Driving Licence update. The system never touches a government database — it prepares the request and points them to the right physical facilitation office. |
+| 🤖 **Scheme & policy chatbot** | Ask "What is PM-KISAN and who qualifies?" and get an answer grounded in the real scheme catalogue — not the model's guesses. A code-level topic gate rejects off-topic questions before they ever reach the model, closing the door on prompt injection. |
+| 💬 **WhatsApp-native access** | An n8n automation layer means citizens never need to install an app — they simply message a WhatsApp number. |
+| 🔒 **Privacy by construction** | Any Aadhaar/PAN-shaped number is masked down to its last 4 digits *inside* the vision pipeline, before it's ever written to disk or logged — enforced by automated tests, not just a policy document. |
+| 📶 **Live cross-device status** | A Firebase bridge mirrors current status across the mobile app, website, and admin views every 60 seconds, so a citizen can track a complaint from any device. |
+
+---
+
+## Built On Snapdragon
+
+Gram Seva AI is designed around Qualcomm's four-tier compute story:
+
+- **Snapdragon X Elite (Copilot+ PC)** — the on-prem compute hub: local FastAPI orchestrator, Gemma 4B intent classification, offline Whisper STT, and document/ID vision-OCR.
+- **OnePlus 15 / Web** — the citizen and field-agent front doors, for voice capture, grievance forms, and live status.
+- **Arduino UNO Q** — the physical sensing layer for water pumps and streetlights.
+- **Qualcomm AI Cloud 100** — purely optional escalation and sync, invoked only when connectivity is available.
+
+---
+
+## App Experience
+
+The mobile/web client (built for the OnePlus 15 and browser) covers the full citizen journey — onboarding, profile, home feed of village announcements, grievance tracking, and a dedicated voice-command screen ("KaniyurStart") for hands-free interaction.
+
+*(See `/screenshots` for the full onboarding → grievance → voice flow.)*
+
+---
+
+## Architecture: Two Backends, One Bridge
+
+The system deliberately splits into two services, each owning what it's best at, joined by Firebase:
+
+- **Python Orchestrator** (`orchestrator/`, `grievance/`, `id_services/`, `dal/`) — owns voice intake, intent classification, grievances, Arduino sensor cross-checks, and ID-update requests. This is the low-latency path the app talks to directly for anything voice- or model-driven.
+- **Node/Express Backend** (`Gram_Seva_Ai/backend/`) — owns citizens, schemes, eligibility, applications, and documents via Prisma/Postgres, and bridges everything to Firebase Firestore for real-time cross-device status.
+
+Both share a single physical Postgres instance with clearly separated table ownership — not two competing sources of truth. Full contract in [`shared/CONTRACT.md`](./shared/CONTRACT.md), Firestore bridge shape in [`react_firebase_integration.md`](./react_firebase_integration.md).
+
+---
+
+## Repo Layout
+
+```
+orchestrator/     FastAPI app — intent classification, voice (Whisper), routing
 dal/               Device Abstraction Layer — dal.read()/dal.write(), simulated Arduino backend
-grievance/         Grievance Platform: POST/GET /grievances, sensor cross-check, dept routing
-id_services/       Aadhaar/PAN/DL update REQUEST intake — never writes to a gov system directly
-shared/            Contract + data-governance docs, Pydantic schemas/enums, Postgres schema, DB engine
+grievance/         Grievance Platform — filing, sensor cross-check, department routing
+id_services/       Aadhaar/PAN/DL update request intake (never writes to a gov system)
+shared/            API contract, data-governance policy, DB schema, Pydantic models
 infra/             docker-compose (local Postgres), Arduino wiring notes
-tests/             Offline unit tests (classifier, DAL, ID masking — no DB/network required)
-website/           Glassmorphic React web client (Vite) — see website/README.md
-Frontend/          FlutterFlow mobile app (OnePlus 15 citizen/field-agent client)
-Gram_Seva_Ai/      Node/Express/Prisma backend — citizens, schemes, eligibility, Firebase bridge
-react_firebase_integration.md   Firestore bridge contract (requests/responses/live collections)
+tests/             Offline unit tests — no DB/network required
+website/           Glassmorphic React web client (Vite)
+Frontend/          FlutterFlow mobile app (OnePlus 15 client)
+Gram_Seva_Ai/      Node/Express/Prisma backend — citizens, schemes, Firebase bridge
 ```
 
-## Setup (under 5 minutes for the orchestrator; longer if you also stand up the Node backend + website)
+---
 
-### 1. Start Postgres
+## Quick Start
 
+**1. Start Postgres**
 ```bash
 cd infra
 docker compose up -d
 ```
+Applies the schema automatically (`gramseva` / `gramseva` / `gramseva`). Point the Node backend at the same instance:
+```bash
+cd Gram_Seva_Ai/backend && npx prisma migrate deploy
+```
 
-This starts Postgres on `localhost:5432` and applies
-[`shared/schema.sql`](shared/schema.sql) automatically on first boot
-(user `gramseva` / password `gramseva` / db `gramseva`). The Node backend
-uses the **same instance** — apply its Prisma migrations against it too
-(`cd Gram_Seva_Ai/backend && npx prisma migrate deploy`).
-
-No Docker on hand? Point `DATABASE_URL` at any local Postgres 14+ instance
-and apply the schema yourself: `psql -d gramseva -f shared/schema.sql`.
-
-### 2. Install Python dependencies
-
+**2. Install Python dependencies**
 ```bash
 python -m venv .venv
 .venv\Scripts\activate        # Windows
@@ -101,43 +140,31 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 3. Configure environment
-
+**3. Configure environment**
 ```bash
 cp .env.example .env
 ```
+Runs out of the box with offline mock classifier/STT/vision — no model weights needed for a quick demo. Point `LLM_BACKEND` / `STT_BACKEND` / `VISION_BACKEND` at your local Gemma 4B / Whisper / OCR models when ready.
 
-Defaults work out of the box against the docker-compose Postgres and the
-offline mock classifier/stub STT/stub vision backends — **no model weights
-required to run the demo.** See `.env.example` for how to point
-`LLM_BACKEND`, `STT_BACKEND`, and `VISION_BACKEND` at your real local
-Gemma4/Whisper/vision-OCR models, and the intranet-IP note at the top of
-that file if models or Postgres run on a different LAN machine.
-
-### 4. Run the orchestrator
-
+**4. Run the orchestrator**
 ```bash
 uvicorn orchestrator.main:app --reload --port 8000
 ```
+API docs live at `http://localhost:8000/docs`.
 
-Docs at `http://localhost:8000/docs`.
-
-### 5. (Optional) Run the Node backend + website
-
+**5. (Optional) Run the Node backend + website**
 ```bash
-cd Gram_Seva_Ai/backend && npm install && cp .env.example .env && npm run dev   # port 3000
-cd website && npm install && cp .env.example .env.local && npm run dev          # port 5173
+cd Gram_Seva_Ai/backend && npm install && cp .env.example .env && npm run dev   # :3000
+cd website && npm install && cp .env.example .env.local && npm run dev          # :5173
 ```
 
-Both need Node.js installed — **not verified/built in this environment**
-(no Node.js available here); install dependencies and confirm they build
-before a live demo.
+> For the full, dependency-checked, "what's actually verified working" walkthrough, see **[`RUNBOOK.md`](./RUNBOOK.md)** — it's kept more current than any other doc in this repo.
 
-## Try it (zero network required beyond localhost)
+---
 
-**Submit a grievance via the orchestrator** (voice-pipeline shape, per
-`shared/CONTRACT.md` §1):
+## Try It
 
+**File a voice grievance:**
 ```bash
 curl -X POST http://localhost:8000/orchestrate \
   -H "Content-Type: application/json" \
@@ -149,23 +176,15 @@ curl -X POST http://localhost:8000/orchestrate \
   }'
 ```
 
-Returns the routing decision plus the created grievance's id
-(`downstream.resource_id`). Watch the server's stdout — every request logs
-a `routing_decision` JSON line showing `intent`, `confidence`, and whether
-it was handled `local`ly or `cloud_escalated`.
-
-**Check status:**
-
+**Ask the scheme chatbot:**
 ```bash
-curl http://localhost:8000/grievances/<id-from-above>
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is PM-KISAN and who is eligible?"}'
 ```
+Try an off-topic question ("write me a poem") and watch `on_topic: false` come back — rejected before it ever reaches a model.
 
-For a streetlight/water grievance, the response includes `sensor_check`
-showing the live DAL reading and whether it came back `verified` or
-`disputed` against the (simulated) Arduino state.
-
-**Flip the sensor and resubmit** to see the verdict change:
-
+**Flip a simulated sensor and re-check a grievance:**
 ```bash
 python -c "
 from dal.factory import get_dal
@@ -173,98 +192,43 @@ get_dal().write('arduino_uno_q', 'streetlight_status', {'on': False})
 "
 ```
 
-**Try an ID-update request** (never writes to a real government system —
-see `shared/DATA_GOVERNANCE.md` §1):
-
-```bash
-curl -X POST http://localhost:8000/id-requests \
-  -H "Content-Type: application/json" \
-  -d '{
-    "citizen_id": "+919900011122",
-    "id_type": "aadhaar",
-    "update_type": "address_change",
-    "description": "We moved from Rampur to Ward 4, need address updated",
-    "source_channel": "form"
-  }'
-```
-
-The response includes `authority_office` — the physical facilitation
-centre the citizen still has to visit.
-
-**Or submit straight to the Grievance Platform** (bypassing the
-orchestrator, e.g. for offline form entry):
-
-```bash
-curl -X POST http://localhost:8000/grievances \
-  -H "Content-Type: application/json" \
-  -d '{
-    "citizen_id": "+919900011122",
-    "category": "water",
-    "description": "No water from the tap since morning",
-    "location": "Ward 4",
-    "priority": "medium",
-    "source_channel": "form"
-  }'
-```
-
-**Ask the scheme/policy chatbot:**
-
-```bash
-curl -X POST http://localhost:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What is PM-KISAN and who is eligible?"}'
-```
-
-Off-topic questions (`"write me a poem"`) are refused before ever reaching
-a model — try it and check `on_topic: false` in the response.
-
-## Running tests
-
+Run the offline test suite:
 ```bash
 pytest
 ```
 
-Covers the mock classifier, DAL/simulated backend, and the ID-document
-PII-masking guardrail — no DB or network required. (Full grievance/ID
-flows are exercised via the curl examples above against the running
-server + Postgres.)
+---
 
-## Design notes for the team
+## Design Principles
 
-- **Extensible intent enum** — `Intent` (`shared/enums.py`) now has 6
-  values (added `id_update_request`); add more without breaking existing
-  consumers (unknown intents should be logged, not hard-failed).
-- **DAL is the only device contract** — orchestrator and grievance code
-  never call a device driver directly, only `dal.read()`/`dal.write()`.
-  Swapping the simulated Arduino backend for the real board means adding
-  one new `DeviceBackend` in `dal/`, per
-  [`infra/arduino/README.md`](infra/arduino/README.md).
-- **Local-first, cloud-optional** — `cloud_escalate()`
-  (`orchestrator/routing.py`) and `sync_to_gov_cloud()`
-  (`grievance/sync.py`) are both stubs, non-blocking with respect to the
-  local write path by design.
-- **ID update requests never touch a government system** — `id_services/`
-  prepares a request and names a facilitation office; it does not and
-  cannot submit to UIDAI/NSDL/Parivahan. See `shared/DATA_GOVERNANCE.md` §1.
-- **The chatbot's topic gate runs before any model call** — `_is_on_topic()`
-  in `orchestrator/scheme_chat.py` refuses off-topic questions in code, not
-  by hoping the model's system prompt holds up against prompt injection.
-  Answers are grounded in the real `Scheme` table (cross-database read from
-  the Node backend's Postgres DB), not the model's pretrained knowledge.
-- **OCR output is masked before it's ever persisted, not after** —
-  `orchestrator/vision.py`'s `mask_sensitive_fields()` runs inside the
-  vision client itself; nothing downstream (the id_services DB write, any
-  log line) ever sees a full Aadhaar/PAN number. Enforced by
-  `tests/test_id_services.py`, not just documented.
-- **PII masking is enforced, not just documented** — `orchestrator/vision.py`
-  masks any Aadhaar/PAN-shaped value to its last 4 characters before it's
-  ever persisted; see `tests/test_id_services.py` for the enforcement tests.
-- **Table ownership** — `grievances`, `device_state`, and
-  `id_update_requests` are owned by this repo's Python side; citizens/
-  schemes/applications/documents are owned by `Gram_Seva_Ai/backend`'s
-  Prisma schema. `farmer_produce` is reserved but undefined — coordinate
-  before adding it.
+- **Local-first, cloud-optional** — cloud escalation and sync are non-blocking stubs by design; the local write path never waits on the network.
+- **One contract to the sensing layer** — orchestrator and grievance code only ever call `dal.read()` / `dal.write()`; swapping the simulated Arduino for a real board means adding one backend, nothing else changes.
+- **Privacy enforced in code, not policy** — PII masking happens inside the vision client itself, before anything is persisted or logged, and is covered by automated tests.
+- **The model never freelances** — the scheme chatbot's topic gate is a code-level check that runs *before* any model call, and every answer is grounded in the real scheme database.
+- **ID requests stay in their lane** — the system prepares and routes a request; it never writes to UIDAI, NSDL, or Parivahan directly. Citizens are pointed to the correct facilitation office every time.
 
-## License
+Full rationale in [`shared/DATA_GOVERNANCE.md`](./shared/DATA_GOVERNANCE.md).
 
-MIT — see [`LICENSE`](LICENSE).
+---
+
+## The Team
+
+**XDOSO Tech Labs LLP**
+
+| Name | Role |
+|---|---|
+| **Dhevadharshan Srinivasan** | CEO, XDOSO Tech Labs LLP · Director, Veritas Fine Sinter · 4th Year B.E. ECE, KPRIET, Coimbatore |
+| **Mithun Barath Mayilsamy** | CISO, XDOSO Tech Labs LLP |
+| **Tamilselvan Narayanan** | App Development Lead, XDOSO Tech Labs LLP · Final Year B.E. ECE, KPRIET, Coimbatore |
+| **Varshini Srinivasan** | Final Year B.E. ECE, KPRIET, Coimbatore |
+| **Rajeswaran Dinakaran** | 3rd Year B.E. CSE, KPRIET, Coimbatore |
+
+📧 dhevreads@gmail.com &nbsp;·&nbsp; 🌐 [www.dhev.online](http://www.dhev.online) &nbsp;·&nbsp; ▶️ [Demo Video](https://youtu.be/oFbAL97vr0U)
+
+---
+
+<div align="center">
+
+*Gram Seva AI — bringing every village office online, without needing the internet.*
+
+</div>
