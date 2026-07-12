@@ -9,8 +9,10 @@
 *In collaboration with Qualcomm Snapdragon, Sarvam AI, and OnePlus*
 
 [![Watch the Demo](https://img.shields.io/badge/▶-Watch%20the%20Demo-red?style=for-the-badge)](https://youtu.be/oFbAL97vr0U)
+[![Open Source](https://img.shields.io/badge/license-Open%20Source-brightgreen)](#license)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
-**Team GramSeva AI** — presented by **XDOSO Tech Labs LLP**
+**Team GramSeva AI** — Powered by **Qualcomm's Hardwares and XDT Lab's team**
 
 </div>
 
@@ -24,7 +26,7 @@ Village government offices (Gram Panchayats) serve millions of citizens who ofte
 
 **Gram Seva AI puts the entire office in a citizen's voice.**
 
-A villager speaks — in their own language, over WhatsApp or a shared kiosk — and the system files a grievance, checks a scheme's eligibility, or requests an ID update. No app literacy required. No internet required. Everything runs **on-prem, offline, on-device**, powered by **Gemma 4B** running locally, with an in-house orchestration engine we call **AetherRoute** deciding what happens next.
+A villager speaks — in their own language, over WhatsApp or a shared kiosk — and the system files a grievance, checks a scheme's eligibility, or requests an ID update. No app literacy required. No internet required. Everything runs **on-prem, offline, on-device**, powered by **Gemma 4B** running locally, with our in-house orchestration engine — **AetherRoute** — deciding what happens next.
 
 This isn't a hackathon toy — it's designed as a real deployment path for India's **Digital Governance (DigiGov)** initiatives, built on Qualcomm Snapdragon compute from day one.
 
@@ -58,6 +60,10 @@ Citizen speaks (WhatsApp / App / Kiosk / Website)
 **The core design principle:** every essential function works with the network cable pulled out. The cloud is an upgrade, never a dependency.
 
 ---
+## The Business Model
+
+![Gram Seva AI](https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/WhatsApp%20Image%202026-07-07%20at%2012.25.01.jpeg?alt=media&token=e240ba7e-d7f8-46ef-979a-cb0ea2a486c5)
+
 
 ## What It Actually Does
 
@@ -92,30 +98,94 @@ The mobile/web client (built for the OnePlus 15 and browser) covers the full cit
 
 ---
 
-## Architecture: Two Backends, One Bridge
+## The Stack, In Depth
 
-The system deliberately splits into two services, each owning what it's best at, joined by Firebase:
+Gram Seva AI is a **system of systems** — two application backends and one orchestration engine, each doing one job well.
 
-- **Python Orchestrator** (`orchestrator/`, `grievance/`, `id_services/`, `dal/`) — owns voice intake, intent classification, grievances, Arduino sensor cross-checks, and ID-update requests. This is the low-latency path the app talks to directly for anything voice- or model-driven.
-- **Node/Express Backend** (`Gram_Seva_Ai/backend/`) — owns citizens, schemes, eligibility, applications, and documents via Prisma/Postgres, and bridges everything to Firebase Firestore for real-time cross-device status.
+### ⚡ AetherRoute — The Orchestration Core
 
-Both share a single physical Postgres instance with clearly separated table ownership — not two competing sources of truth. Full contract in [`shared/CONTRACT.md`](./shared/CONTRACT.md), Firestore bridge shape in [`react_firebase_integration.md`](./react_firebase_integration.md).
+Every voice request, grievance classification, and chatbot query in Gram Seva AI passes through **AetherRoute**, our in-house multi-provider LLM orchestration and routing engine. It's what lets the whole platform run fully on-prem against Gemma 4B while still being resilient, cost-safe, and auditable — the same qualities you'd want from a cloud LLM gateway, but running locally on a Snapdragon X Elite box with zero internet dependency.
+
+```
+                         ┌─────────────────────┐
+   Request  ───────────► │   Input Sanitizer    │
+                         └──────────┬───────────┘
+                                    ▼
+                         ┌─────────────────────┐
+                         │  Cache Lookup        │ ── Exact + Semantic (Redis / in-memory)
+                         └──────────┬───────────┘
+                              Cache Hit │ Cache Miss
+                          ◄────────────┘         │
+                    (return cached response)     ▼
+                                       ┌─────────────────────────┐
+                                       │  Context Curation        │  Sliding window + TF-IDF
+                                       │                           │  relevance + async summarization
+                                       └──────────┬────────────────┘
+                                                  ▼
+                                       ┌─────────────────────────┐
+                                       │  Scoring & Decision      │  Task fit, cost, latency,
+                                       │  Router                  │  SQLite historical performance
+                                       └──────────┬────────────────┘
+                                                  ▼
+                                       ┌─────────────────────────┐
+                                       │  Provider Pool            │  Gemma 4B (on-prem) · OpenAI ·
+                                       │                            │  Anthropic Claude · Mistral · Ollama
+                                       └───┬──────────────────┬────┘
+                                      Success│              │Failure
+                                            ▼                ▼
+                              ┌──────────────────────┐   ┌────────────────────┐
+                              │ Pydantic Validator    │   │ Hot Failover        │
+                              │ (up to 3 repair       │   │ → next-best         │
+                              │  re-prompt retries)    │   │   provider           │
+                              └──────────┬────────────┘   └──────────┬─────────┘
+                                        ▼                            │
+                              ┌──────────────────────┐               │
+                              │ SQLite Logging         │◄─────────────┘
+                              │ (cost, latency, trace) │
+                              └──────────┬────────────┘
+                                        ▼
+                                   Final Response
+```
+
+**Why Gram Seva AI needed to build this rather than call a model directly:**
+
+| AetherRoute Feature | What it gives Gram Seva AI |
+|---|---|
+| **Resilient Failover & Registry** | If the on-prem Gemma 4B instance is ever degraded, the orchestrator can hot-fail to a backup provider without a citizen's request ever failing outright. |
+| **Prompt Normalization** | One unified prompt format across every model backend the platform might use — no rewriting intent-classification prompts per provider. |
+| **Real-Time Cost Governor** | Hard per-request and per-session cost ceilings, so any future cloud-escalation path (Qualcomm AI Cloud 100) can never runaway-bill a village office. |
+| **Sliding Context Curation** | TF-IDF relevance pruning keeps long grievance/chat conversations inside the token window without losing older, relevant complaint context. |
+| **Output Validation & Repair Loops** | Every intent classification and structured extraction (grievance category, urgency, ID-update type) is Pydantic-validated, with automatic repair re-prompts — no malformed JSON ever reaches the database. |
+| **Security Input Sanitization** | Regex-based injection detection and RBAC guards are the first thing a citizen's transcript hits — this is what makes the scheme chatbot's topic gate hold even against adversarial prompts. |
+| **Fuzzy Semantic Cache** | Common questions ("What is PM-KISAN?", asked in a dozen phrasings across a village) get served from cache instead of re-running inference every time. |
+| **CLI Observability Report** | Every routing decision, cost, and retry across the whole platform is queryable via `aetherroute-report` — critical for debugging a system meant to run unsupervised in a panchayat office. |
+
+### 🐍 Python Orchestrator Layer
+
+`orchestrator/`, `grievance/`, `id_services/`, `dal/` — owns voice intake, intent classification (via AetherRoute + Gemma 4B), grievances, Arduino sensor cross-checks, and Aadhaar/PAN/Driving-Licence update requests. This is the low-latency path the app talks to directly for anything voice- or model-driven.
+
+### 🟩 Node/Express Backend
+
+`Gram_Seva_Ai/backend/` — owns citizens, schemes, eligibility, applications, and documents via Prisma/Postgres, and bridges everything to Firebase Firestore for real-time cross-device status.
+
+Both backends share a single physical Postgres instance with clearly separated table ownership — not two competing sources of truth. Full contract in [`shared/CONTRACT.md`](./shared/CONTRACT.md), Firestore bridge shape in [`react_firebase_integration.md`](./react_firebase_integration.md).
 
 ---
 
 ## Repo Layout
 
 ```
-orchestrator/     FastAPI app — intent classification, voice (Whisper), routing
-dal/               Device Abstraction Layer — dal.read()/dal.write(), simulated Arduino backend
-grievance/         Grievance Platform — filing, sensor cross-check, department routing
-id_services/       Aadhaar/PAN/DL update request intake (never writes to a gov system)
-shared/            API contract, data-governance policy, DB schema, Pydantic models
-infra/             docker-compose (local Postgres), Arduino wiring notes
-tests/             Offline unit tests — no DB/network required
-website/           Glassmorphic React web client (Vite)
-Frontend/          FlutterFlow mobile app (OnePlus 15 client)
-Gram_Seva_Ai/      Node/Express/Prisma backend — citizens, schemes, Firebase bridge
+orchestrator/       FastAPI app — intent classification (via AetherRoute), voice (Whisper), routing
+aetherroute/         Multi-provider LLM orchestration engine — caching, cost control, validation, failover
+dal/                 Device Abstraction Layer — dal.read()/dal.write(), simulated Arduino backend
+grievance/           Grievance Platform — filing, sensor cross-check, department routing
+id_services/         Aadhaar/PAN/DL update request intake (never writes to a gov system)
+shared/              API contract, data-governance policy, DB schema, Pydantic models
+infra/               docker-compose (local Postgres), Arduino wiring notes
+tests/               Offline unit tests — no DB/network required
+website/             Glassmorphic React web client (Vite)
+Frontend/            FlutterFlow mobile app (OnePlus 15 client)
+Gram_Seva_Ai/        Node/Express/Prisma backend — citizens, schemes, Firebase bridge
 ```
 
 ---
@@ -139,12 +209,13 @@ python -m venv .venv
 # source .venv/bin/activate   # macOS/Linux
 pip install -r requirements.txt
 ```
+This installs **AetherRoute** alongside the rest of the orchestrator's dependencies.
 
 **3. Configure environment**
 ```bash
 cp .env.example .env
 ```
-Runs out of the box with offline mock classifier/STT/vision — no model weights needed for a quick demo. Point `LLM_BACKEND` / `STT_BACKEND` / `VISION_BACKEND` at your local Gemma 4B / Whisper / OCR models when ready.
+Runs out of the box with offline mock classifier/STT/vision — no model weights needed for a quick demo. Point `LLM_BACKEND` / `STT_BACKEND` / `VISION_BACKEND` at your local Gemma 4B / Whisper / OCR models when ready. AetherRoute itself runs in mock mode with zero API keys set — set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `MISTRAL_API_KEY` only if you want a live cloud-escalation fallback provider.
 
 **4. Run the orchestrator**
 ```bash
@@ -176,13 +247,13 @@ curl -X POST http://localhost:8000/orchestrate \
   }'
 ```
 
-**Ask the scheme chatbot:**
+**Ask the scheme chatbot (routed through AetherRoute):**
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{"question": "What is PM-KISAN and who is eligible?"}'
 ```
-Try an off-topic question ("write me a poem") and watch `on_topic: false` come back — rejected before it ever reaches a model.
+Try an off-topic question ("write me a poem") and watch `on_topic: false` come back — rejected by AetherRoute's security layer before it ever reaches a model.
 
 **Flip a simulated sensor and re-check a grievance:**
 ```bash
@@ -190,6 +261,11 @@ python -c "
 from dal.factory import get_dal
 get_dal().write('arduino_uno_q', 'streetlight_status', {'on': False})
 "
+```
+
+**Inspect AetherRoute's own routing decisions, cost, and latency:**
+```bash
+aetherroute-report --db aetherroute.db --traces 25
 ```
 
 Run the offline test suite:
@@ -203,11 +279,19 @@ pytest
 
 - **Local-first, cloud-optional** — cloud escalation and sync are non-blocking stubs by design; the local write path never waits on the network.
 - **One contract to the sensing layer** — orchestrator and grievance code only ever call `dal.read()` / `dal.write()`; swapping the simulated Arduino for a real board means adding one backend, nothing else changes.
+- **One contract to the model layer** — every model call, whether it's intent classification or the scheme chatbot, goes through AetherRoute; swapping Gemma 4B for another backend, or adding a cloud fallback, never touches application code.
 - **Privacy enforced in code, not policy** — PII masking happens inside the vision client itself, before anything is persisted or logged, and is covered by automated tests.
 - **The model never freelances** — the scheme chatbot's topic gate is a code-level check that runs *before* any model call, and every answer is grounded in the real scheme database.
 - **ID requests stay in their lane** — the system prepares and routes a request; it never writes to UIDAI, NSDL, or Parivahan directly. Citizens are pointed to the correct facilitation office every time.
+- **Nothing is a black box** — both the platform's grievance routing and AetherRoute's model routing decisions are logged and queryable, not hidden inside a single opaque call.
 
-Full rationale in [`shared/DATA_GOVERNANCE.md`](./shared/DATA_GOVERNANCE.md).
+Full data-governance rationale in [`shared/DATA_GOVERNANCE.md`](./shared/DATA_GOVERNANCE.md).
+
+---
+
+## License
+
+Gram Seva AI, including the AetherRoute orchestration engine, is released as **open source**. See the `LICENSE` file in this repository for the exact terms.
 
 ---
 
