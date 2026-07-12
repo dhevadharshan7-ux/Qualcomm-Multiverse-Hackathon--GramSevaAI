@@ -41,10 +41,17 @@ This isn't a hackathon toy — it's designed as a real deployment path for India
   <img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/Screenshot%202026-07-12%20at%201.30.47%E2%80%AFPM.png?alt=media&token=ef499ea4-24cc-43a2-9592-023d0c6d6f3c" width="150"/>
 </div>
 
+---
+
 <div align="center">
             <img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/WhatsApp%20Image%202026-07-12%20at%2013.40.43.jpeg?alt=media&token=2c0b31ec-5783-40aa-861b-543cf352255b" width="900"/>
 </div>
 
+---
+
+<div align="center">
+<img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/Screenshot%202026-07-12%20at%201.53.37%E2%80%AFPM.png?alt=media&token=f3b7ea70-01e0-4075-82ff-748947d643de" width="900"/>
+</div>
 ## How It Works
 
 ```
