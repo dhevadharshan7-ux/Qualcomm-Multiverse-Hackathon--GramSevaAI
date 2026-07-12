@@ -15,6 +15,7 @@ const FEATURES = [
   { icon: '📍', title: 'Auto Location', desc: 'Precise location tagging for village infrastructure issues.' },
   { icon: '🤖', title: 'AI Classification', desc: 'Complaints are automatically categorized and routed for officers.' },
   { icon: '🪪', title: 'ID Assistance', desc: 'Get help preparing Aadhaar, PAN, and Driving Licence update requests.' },
+  { icon: '💬', title: 'Ask About Schemes', desc: 'Chat with our assistant about government schemes and eligibility.' },
 ];
 
 export default function Home({ language, setLanguage }) {
@@ -74,10 +75,19 @@ export default function Home({ language, setLanguage }) {
       </GlassCard>
 
       <GlassCard>
-        <div className="stack" style={{ alignItems: 'center' }}>
-          <Link to="/grievances/new" style={{ textDecoration: 'none', width: '100%' }}>
-            <Button full>Get Started →</Button>
-          </Link>
+        <div className="stack">
+          <h3>Quick actions</h3>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <Link to="/grievances/new" style={{ textDecoration: 'none', flex: '1 1 200px' }}>
+              <Button full>📋 Register Grievance</Button>
+            </Link>
+            <Link to="/chat" style={{ textDecoration: 'none', flex: '1 1 200px' }}>
+              <Button full variant="secondary">💬 Ask About Schemes</Button>
+            </Link>
+            <Link to="/id-requests" style={{ textDecoration: 'none', flex: '1 1 200px' }}>
+              <Button full variant="outline">🪪 Aadhaar / PAN / DL Help</Button>
+            </Link>
+          </div>
           <p className="row" style={{ fontSize: 12, justifyContent: 'center' }}>
             🔒 Your data is secure and offline-first
           </p>

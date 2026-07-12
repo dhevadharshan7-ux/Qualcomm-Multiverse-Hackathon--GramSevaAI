@@ -59,3 +59,17 @@ export function attachIdRequestDocument(id, file) {
   form.append('file', file);
   return fetch(`${BASE_URL}/id-requests/${id}/document`, { method: 'POST', body: form }).then(asJson);
 }
+
+export function askChat(question) {
+  return fetch(`${BASE_URL}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  }).then(asJson);
+}
+
+export function askChatVoice(audioBlob) {
+  const form = new FormData();
+  form.append('audio', audioBlob, 'recording.webm');
+  return fetch(`${BASE_URL}/chat/voice`, { method: 'POST', body: form }).then(asJson);
+}

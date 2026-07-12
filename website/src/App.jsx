@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import NavTabs from './components/NavTabs';
+import Sidebar from './components/Sidebar';
 import Home from './pages/Home';
 import RegisterGrievance from './pages/RegisterGrievance';
 import GrievanceDetail from './pages/GrievanceDetail';
@@ -8,6 +8,7 @@ import MyGrievances from './pages/MyGrievances';
 import IDUpdateRequest from './pages/IDUpdateRequest';
 import IDRequestDetail from './pages/IDRequestDetail';
 import Profile from './pages/Profile';
+import Chat from './pages/Chat';
 
 function usePersistentState(key, initial) {
   const [value, setValue] = useState(() => localStorage.getItem(key) ?? initial);
@@ -28,29 +29,33 @@ export default function App() {
         <span />
       </div>
 
-      <Routes>
-        <Route path="/" element={<Home language={language} setLanguage={setLanguage} />} />
-        <Route path="/grievances" element={<MyGrievances />} />
-        <Route path="/grievances/new" element={<RegisterGrievance language={language} />} />
-        <Route path="/grievances/:id" element={<GrievanceDetail />} />
-        <Route path="/id-requests" element={<IDUpdateRequest language={language} />} />
-        <Route path="/id-requests/:id" element={<IDRequestDetail />} />
-        <Route
-          path="/profile"
-          element={
-            <Profile
-              phone={phone}
-              setPhone={setPhone}
-              language={language}
-              setLanguage={setLanguage}
-              voiceEnabled={voiceEnabled}
-              setVoiceEnabled={setVoiceEnabled}
+      <div className="app-layout">
+        <Sidebar />
+        <div className="content-area">
+          <Routes>
+            <Route path="/" element={<Home language={language} setLanguage={setLanguage} />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/grievances" element={<MyGrievances />} />
+            <Route path="/grievances/new" element={<RegisterGrievance language={language} />} />
+            <Route path="/grievances/:id" element={<GrievanceDetail />} />
+            <Route path="/id-requests" element={<IDUpdateRequest language={language} />} />
+            <Route path="/id-requests/:id" element={<IDRequestDetail />} />
+            <Route
+              path="/profile"
+              element={
+                <Profile
+                  phone={phone}
+                  setPhone={setPhone}
+                  language={language}
+                  setLanguage={setLanguage}
+                  voiceEnabled={voiceEnabled}
+                  setVoiceEnabled={setVoiceEnabled}
+                />
+              }
             />
-          }
-        />
-      </Routes>
-
-      <NavTabs />
+          </Routes>
+        </div>
+      </div>
     </div>
   );
 }

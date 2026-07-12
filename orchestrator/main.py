@@ -18,7 +18,7 @@ load_dotenv()
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from dal.factory import get_dal
 from dal.interface import DAL
@@ -30,6 +30,7 @@ from id_services.main import router as id_services_router
 from orchestrator.classifier import IntentClassifier, MockIntentClassifier, get_classifier
 from orchestrator.logging_config import configure_logging, log_routing_decision
 from orchestrator.routing import route
+from orchestrator.scheme_chat import ChatResponse, SchemeChatClient, ask, get_chat_client
 from orchestrator.speech import SpeechToTextClient, get_speech_client
 from shared.db import get_db
 from shared.enums import Channel, Intent, Language
@@ -168,6 +169,45 @@ async def orchestrate_ws(websocket: WebSocket):
         pass
     finally:
         db_gen.close()
+
+
+class ChatRequest(BaseModel):
+    question: str
+
+
+@app.post("/chat", response_model=ChatResponse)
+def chat(
+    req: ChatRequest,
+    chat_client: SchemeChatClient = Depends(get_chat_client),
+):
+    """Scheme/policy Q&A — see orchestrator/scheme_chat.py for the
+    topic-gate + grounding guardrails. Off-topic questions never reach the
+    model at all."""
+    response = ask(req.question, chat_client)
+    logger.info(
+        "chat_request",
+        extra={
+            "extra_fields": {
+                "on_topic": response.on_topic,
+                "matched_schemes": len(response.matched_schemes),
+            }
+        },
+    )
+    return response
+
+
+@app.post("/chat/voice", response_model=ChatResponse)
+async def chat_voice(
+    audio: UploadFile = File(...),
+    speech_client: SpeechToTextClient = Depends(get_speech_client),
+    chat_client: SchemeChatClient = Depends(get_chat_client),
+):
+    audio_bytes = await audio.read()
+    try:
+        transcription = speech_client.transcribe(audio_bytes, audio.filename or "audio")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"speech-to-text failed: {e}") from e
+    return ask(transcription.transcript, chat_client)
 
 
 @app.get("/health")

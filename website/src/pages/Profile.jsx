@@ -85,7 +85,7 @@ export default function Profile({ phone, setPhone, language, setLanguage, voiceE
       </GlassCard>
 
       <p style={{ textAlign: 'center', fontSize: 12 }}>
-        Gram Seva AI v0.2.0 · Powered by Qualcomm Hackathon Tech
+        Gram Seva AI v0.3.0 · Powered by Qualcomm Hackathon Tech
       </p>
     </div>
   );

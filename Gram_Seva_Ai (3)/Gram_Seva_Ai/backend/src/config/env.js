@@ -43,6 +43,10 @@ const config = {
 
   // CORS
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+
+  // Python orchestrator (grievances, ID-update requests, intent
+  // classification — not part of this app's Prisma schema)
+  pythonOrchestratorUrl: process.env.PYTHON_ORCHESTRATOR_URL || 'http://localhost:8000',
 };
 
 module.exports = config;

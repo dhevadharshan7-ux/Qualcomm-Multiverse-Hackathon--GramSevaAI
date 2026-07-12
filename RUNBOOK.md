@@ -19,11 +19,15 @@ Checked directly, not assumed:
 | `gramseva` database (Python orchestrator) | ✅ Created, schema applied, verified end-to-end |
 | Ollama | ✅ Installed and running (`http://localhost:11434`) |
 | A real Gemma model in Ollama | ❌ Not pulled — only one model exists (see below) |
-| Voice transcription (Whisper) | ✅ **Fixed** — `karanchopda333/whisper:latest` in Ollama was a mislabeled text LLM, not real STT (see history). Replaced with `faster-whisper` running in-process (§3.3), no separate server needed. `STT_BACKEND=faster_whisper` is set in `.env` and confirmed working. |
-| `.env` actually being loaded | ✅ **Fixed a real bug** — `python-dotenv` was a listed dependency but `load_dotenv()` was never called anywhere in the code, so every `.env` value was silently ignored in favor of hardcoded defaults (this is why the STT fix above didn't take effect just from editing `.env` — the file was never read at all). Now called at the very top of `orchestrator/main.py`, before any module that reads env vars at import time. **Restart the orchestrator process for this fix to take effect if it's already running.** |
-| Node.js / npm | ✅ Now installed (per website `package.json` changes) — website confirmed working by you |
-| Python venv (`.venv`) | ✅ Set up, dependencies installed (now includes `faster-whisper`) |
-| "Genie CLI" for Gemma | ❌ Not found anywhere on this machine (checked `PATH`, `Program Files`, `AppData`). If you run it from elsewhere, see §3.2. |
+| Voice transcription (Whisper) | ✅ **Verified working, `large-v3`.** Confirmed (not assumed) that Ollama has no audio-input mechanism at all — its own API docs only accept text and base64 images. `karanchopda333/whisper:latest` (the model this project's Ollama had pulled) is a mislabeled text LLM anyway. `faster-whisper` runs `large-v3` in-process instead (§3.3) — real TTS-generated speech ("The streetlight near the temple has not worked for a week") transcribed correctly through the actual `/orchestrate/voice` endpoint and produced a correctly-classified, persisted grievance. |
+| Document/ID OCR | ✅ **Verified working** — `easyocr` (real, in-process, no external binary) reads actual text off a document photo. Tested end-to-end through `/id-requests/{id}/document`: correctly extracted a name, DOB, and masked ID number from a synthetic test ID image. Caught and fixed two real bugs along the way (a Windows console-encoding crash in EasyOCR's progress bar, and a boilerplate-text filter that failed on OCR's merged spacing) — see `orchestrator/vision.py`. |
+| Scheme/policy chatbot | ✅ **New, verified working** — `POST /chat` and `POST /chat/voice`. Grounds answers in the real `Scheme` table (cross-database read from `Gram_Seva_Ai`), refuses off-topic questions before ever calling a model. Tested live through the actual website UI (see §6). |
+| `.env` actually being loaded | ✅ **Fixed a real bug** — `python-dotenv` was a listed dependency but `load_dotenv()` was never called anywhere in the code, so every `.env` value was silently ignored in favor of hardcoded defaults. Now called at the very top of `orchestrator/main.py`, before any module that reads env vars at import time. **Restart the orchestrator process if it's already running for this to take effect.** |
+| Node.js / npm | ✅ Installed and running — website confirmed working, live-tested through the browser this session |
+| Python venv (`.venv`) | ✅ Set up, dependencies installed (`faster-whisper`, `easyocr` added this session) |
+| "Genie CLI" for Gemma | ❌ Still not found anywhere on this machine. `LLM_BACKEND=mock` remains the default; tell me how Genie is actually invoked and I'll wire a proper backend. |
+| Website UI theme | ✅ Redesigned — light grey/white glassmorphism, no dark mode, verified via computed styles in a live browser session (`--bg-base: #f4f5f7`, glass panels `rgba(255,255,255,0.92)`). Left sidebar (Home/ID Help/Profile/Grievances) replaces the old bottom tab bar. |
+| Firebase bridge (teammate's version) | ⚠️ **Restructured since last checked** — `Gram_Seva_Ai (3)/.../src/firebase/` now has `publish/`, `request/`, `scheduler/`, `sync/`, `verify/` subdirectories that didn't exist in the copy I last reviewed. Investigating for WhatsApp/n8n wiring — findings below once complete. |
 
 Machine's LAN IP (Wi-Fi): **`10.91.53.228`** — this is what other devices on
 the network use to reach everything below. It's on subnet `10.91.48.0/20`.
@@ -278,6 +282,82 @@ one serving the website. Same for `VITE_FIREBASE_*` if you want the live
 No separate server — the simulated backend runs in-process inside the
 Python orchestrator (`dal/simulated_backend.py`). Nothing to start. To
 wire in the real board later, see `infra/arduino/README.md`.
+
+---
+
+## 7.5. WhatsApp → n8n → Firebase → Postgres
+
+**Checked, was not implemented — now is.** A teammate had described this
+pipeline as already built; it wasn't (verified by reading every file
+under `Gram_Seva_Ai (3)/.../src/firebase/`, confirmed zero references to
+"n8n" anywhere in the codebase). What *did* already exist and turned out
+to be genuinely wired and working: a generic Firestore request/response
+bridge (`gram_seva_requests` → `actionRouter.js` → Postgres services →
+`gram_seva_responses`), and a separate Postgres→Firestore live mirror
+implemented as a Prisma Client Extension — better engineering than the
+polling-based mirror I'd built for an earlier copy of this backend.
+
+That existing bridge just had no action shaped for an inbound chat
+message. Added one (`handleMessage`, `src/firebase/request/actionRouter.js`
++ new `src/services/orchestrator.service.js`) that forwards to the Python
+orchestrator's `POST /orchestrate` — the same intent-classification path
+voice/form input already goes through, so a WhatsApp message gets treated
+identically: classified, and turned into a grievance or ID-request as
+appropriate.
+
+**Verified for real**, not just code-reviewed: wrote a document directly
+to the live Firestore `gram_seva_requests` collection (using the Node
+backend's actual service-account credentials) simulating exactly what n8n
+would produce, and watched it flow through the running Node backend → Python
+orchestrator → Postgres → back to `gram_seva_responses`, end to end, in
+under 2 seconds. The resulting grievance is real and queryable
+(`GET /grievances/{id}` returns it with `source_channel: "whatsapp"`).
+
+### What n8n needs to do
+
+Whatever n8n workflow receives the WhatsApp Business webhook needs exactly
+one step beyond extracting the phone number and message text: write a
+document to the `gram_seva_requests` Firestore collection shaped like
+this (document ID can be anything unique — a UUID, or the WhatsApp
+message ID):
+
+```json
+{
+  "status": "pending",
+  "action": "handleMessage",
+  "payload": {
+    "transcript": "<the WhatsApp message text>",
+    "language": "en",
+    "channel": "whatsapp",
+    "citizenId": "<the sender's phone number, e.g. +919900011199>"
+  }
+}
+```
+
+The result appears in `gram_seva_responses/<same-document-id>` shortly
+after — `{success: true, data: {intent, downstream: {action, resource_id}, ...}}`
+on success, matching `shared/CONTRACT.md` §1's `/orchestrate` response
+shape. n8n can poll that document or attach its own `onSnapshot` listener
+if it needs to reply back to the citizen on WhatsApp with a status update.
+
+### What's still not connected
+
+- `src/routes/whatsapp.routes.js` (the **old**, pre-existing direct Meta
+  webhook handler) is still mounted and still live — it calls
+  `aiService.chat()` (Claude/Gemini) directly and bypasses this bridge
+  entirely. If n8n is going to own the WhatsApp integration going forward,
+  that route should probably be disabled or reconciled with this one, or
+  the two will independently double-handle/reply to the same inbound
+  messages. Flagging, not fixing — this is a product decision for the team
+  (which one is authoritative), not something to silently resolve.
+- I don't have n8n itself installed anywhere to configure the actual
+  workflow (WhatsApp webhook trigger → this Firestore write) — the above
+  contract is what the *receiving* side now correctly handles; the n8n
+  workflow itself still needs to be built/pointed at it.
+- `src/firebase/verify/hourlyVerification.js` (scheduled hourly, confirmed
+  running) is a stub — logs a line, does no actual Firestore/Postgres
+  reconciliation. Not related to WhatsApp specifically, but worth knowing
+  if you're relying on it for data-integrity checks.
 
 ---
 

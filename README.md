@@ -20,9 +20,17 @@ Runs across four device tiers:
    Never a hard dependency; every core function works with zero internet.
 
 See [`shared/CONTRACT.md`](shared/CONTRACT.md) for the orchestrator's API
-contract, and [`shared/DATA_GOVERNANCE.md`](shared/DATA_GOVERNANCE.md) for
-the Responsible AI / data-security posture — read that one before treating
-this as more than a hackathon demo.
+contract, [`shared/DATA_GOVERNANCE.md`](shared/DATA_GOVERNANCE.md) for the
+Responsible AI / data-security posture (read that one before treating this
+as more than a hackathon demo), and **[`RUNBOOK.md`](RUNBOOK.md) for
+step-by-step startup of every server** — it's kept current with what's
+actually verified working on the dev machine, more so than this file.
+
+Beyond voice grievance/ID-request intake, the orchestrator also serves a
+**scheme/policy chatbot** (`POST /chat`, `POST /chat/voice`) — grounded in
+the real scheme catalog (not the model's pretrained guesses), with a
+code-level topic gate that refuses off-topic questions before they ever
+reach a model. See `orchestrator/scheme_chat.py`.
 
 ## Architecture — two backends, one bridge
 
@@ -199,6 +207,17 @@ curl -X POST http://localhost:8000/grievances \
   }'
 ```
 
+**Ask the scheme/policy chatbot:**
+
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is PM-KISAN and who is eligible?"}'
+```
+
+Off-topic questions (`"write me a poem"`) are refused before ever reaching
+a model — try it and check `on_topic: false` in the response.
+
 ## Running tests
 
 ```bash
@@ -227,6 +246,16 @@ server + Postgres.)
 - **ID update requests never touch a government system** — `id_services/`
   prepares a request and names a facilitation office; it does not and
   cannot submit to UIDAI/NSDL/Parivahan. See `shared/DATA_GOVERNANCE.md` §1.
+- **The chatbot's topic gate runs before any model call** — `_is_on_topic()`
+  in `orchestrator/scheme_chat.py` refuses off-topic questions in code, not
+  by hoping the model's system prompt holds up against prompt injection.
+  Answers are grounded in the real `Scheme` table (cross-database read from
+  the Node backend's Postgres DB), not the model's pretrained knowledge.
+- **OCR output is masked before it's ever persisted, not after** —
+  `orchestrator/vision.py`'s `mask_sensitive_fields()` runs inside the
+  vision client itself; nothing downstream (the id_services DB write, any
+  log line) ever sees a full Aadhaar/PAN number. Enforced by
+  `tests/test_id_services.py`, not just documented.
 - **PII masking is enforced, not just documented** — `orchestrator/vision.py`
   masks any Aadhaar/PAN-shaped value to its last 4 characters before it's
   ever persisted; see `tests/test_id_services.py` for the enforcement tests.
