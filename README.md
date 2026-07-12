@@ -59,6 +59,112 @@ Citizen speaks (WhatsApp / App / Kiosk / Website)
 
 **The core design principle:** every essential function works with the network cable pulled out. The cloud is an upgrade, never a dependency.
 
+## Component Utilisation
+
+How each piece of hardware was actually put to work during the hackathon build — not just present in the architecture, but carrying a specific, non-overlapping responsibility.
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│                     SNAPDRAGON X ELITE — AI PC (Copilot+)                  │
+│                                                                             │
+│   Role: The entire on-prem brain of the platform. Every "AI" and          │
+│   "backend" need in Gram Seva AI is satisfied right here — nothing        │
+│   leaves this machine unless the optional cloud tier is invoked.          │
+│                                                                             │
+│   ├─ Gemma 4B ............... on-device LLM, zero cloud calls             │
+│   ├─ Whisper STT ............ offline speech-to-text                     │
+│   ├─ Vision OCR ............. ID document reading + PII masking          │
+│   ├─ AetherRoute ............ orchestration, routing, validation          │
+│   ├─ FastAPI Orchestrator ... voice / grievance / ID-request APIs        │
+│   ├─ Node/Express Backend ... citizens, schemes, eligibility, docs        │
+│   └─ Postgres (local) ....... single system of record for everything     │
+└───────────────────────────────────────────┬───────────────────────────────┘
+                                             │
+                    served over local network / localhost
+                                             │
+              ┌──────────────────────────────┼──────────────────────────────┐
+              ▼                                                             ▼
+┌──────────────────────────────────┐                    ┌──────────────────────────────────┐
+│      ONEPLUS 15 — MOBILE APP      │                    │      ARDUINO UNO Q — SENSOR NODE  │
+│                                    │                    │                                    │
+│  Role: The end-user's only        │                    │  Role: Deployed on-site at the    │
+│  touchpoint. Owns everything a    │                    │  Qualcomm venue specifically to   │
+│  citizen or field agent sees      │                    │  mitigate real network             │
+│  and does.                        │                    │  restrictions inside the building │
+│                                    │                    │  — a physical, local-only signal   │
+│  ├─ Voice capture (mic)           │                    │  path that never depends on Wi-Fi  │
+│  ├─ Grievance filing UI           │                    │  or venue connectivity.             │
+│  ├─ Status tracking               │                    │                                    │
+│  ├─ Profile / ID-request forms    │                    │     │
+│                                    │                    │                                    │
+│  ✅ Built, packaged, and           │                    │  Talks only to the AI PC over the  │
+│     published for internal        │                    │  Device Abstraction Layer (DAL) —  │
+│     testing — confirmed working   │                    │  no direct network path needed for │
+│     end-to-end.                   │                    │  sensor cross-checks to work.      │
+│                                    │                    │                                   │
+│  📦 Full app source included in   │                    │                                    │
+│     this repo (`Frontend/`).      │                    │                                    │
+└──────────────────────────────────┘                    └──────────────────────────────────┘
+```
+
+**Why this split matters:**
+
+- **The AI PC is the single point of intelligence** — every model call, every backend write, every source-of-truth read happens here. This is deliberate: it's what lets the entire platform work with zero internet, and it's the one node that needs to be Snapdragon-class compute.
+- **The mobile app is intentionally "dumb" by design** — it captures input and displays state, but does no inference and holds no data of record. It was built, packaged, and pushed through internal testing successfully, and the complete app source is included in this repo (`Frontend/`) for review.
+- **The Arduino UNO Q exists to solve one specific, local problem** — the Qualcomm venue's own network restrictions meant the sensing layer couldn't rely on venue Wi-Fi for water/streetlight state. Running it as a locally-wired node sidesteps that constraint entirely and keeps the sensor cross-check working regardless of what the building's network is doing.
+
+- ## Technical Implementation
+
+Everything below was designed, built, integrated, and demoed within the **24-hour window** of the Snapdragon Multiverse Hackathon — not stitched together from pre-existing templates, but engineered from scratch by the team, end to end.
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         0 HR ──────────────────────────► 24 HR            │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ⚡ ORCHESTRATION ENGINE           →  AetherRoute built from scratch     │
+│  🧠 ON-PREM VOICE ASSISTANT        →  Whisper + Gemma 4B, fully offline  │
+│  🖥️ BACKEND SYSTEMS (x2)           →  FastAPI + Node/Express, live DB    │
+│  📱 MOBILE APPLICATION             →  Built, tested, deployed            │
+│  💬 WHATSAPP AUTOMATION            →  n8n voice-to-action pipeline       │
+│  🔌 HARDWARE INTEGRATION           →  Arduino UNO Q sensing layer        │
+│  🔒 SECURITY HARDENING             →  PII masking, injection defense     │
+│                                                                           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### ⚡ Building an Orchestrator From Scratch — AetherRoute
+
+Rather than wiring a single hardcoded call to a single model, the team built **AetherRoute** — a full multi-provider LLM orchestration engine with cost governance, semantic caching, Pydantic-enforced output validation with automatic repair loops, regex-based prompt-injection defense, and hot-failover between providers. This is the piece of technical depth that lets the rest of the platform run confidently on-prem: every voice-to-intent call, every scheme-chatbot answer, and every structured extraction in Gram Seva AI passes through it.
+
+### 🧠 Standing Up an On-Prem Voice Assistant
+
+Speech capture, transcription, and intent understanding were built to run **entirely offline** on the Snapdragon X Elite — Whisper for speech-to-text, Gemma 4B for local intent classification, with zero round-trips to any cloud API. This was a deliberate constraint from hour one, not a fallback bolted on later: the team designed the pipeline so full functionality never depends on the venue's — or a village's — internet connection.
+
+### 🖥️ Two Independent Backends, Cleanly Bridged
+
+Instead of one monolithic service, the team split ownership across a **Python/FastAPI orchestrator** (voice, grievances, ID requests, sensor cross-checks) and a **Node/Express + Prisma backend** (citizens, schemes, eligibility, documents) — sharing one Postgres instance with strict table ownership, and bridged live through Firebase Firestore for cross-device status. Designing and shipping that contract inside 24 hours, rather than defaulting to a single simpler service, was a deliberate architecture call to keep each domain's logic isolated and independently testable.
+
+### 💬 WhatsApp-Native Automation, Not Just an App
+
+To make the platform usable by citizens with zero app literacy, the team built a **full n8n automation layer** connecting WhatsApp directly to the orchestrator — so a villager can file a grievance or ask about a scheme by simply sending a voice note to a WhatsApp number, with no app install required at all.
+
+### 📱 A Mobile App Built, Tested, and Actually Deployed
+
+Beyond the backend, the team designed and built a complete **FlutterFlow mobile application** — onboarding, profile, grievance tracking, and a dedicated voice-interaction screen — and took it all the way through **internal testing on real devices**, confirming the full flow works end-to-end. The complete app source is included in this repo (`Frontend/`) for review, not just a demo build.
+
+### 🔌 Real Hardware, Not a Simulated Excuse
+
+An **Arduino UNO Q** was wired up and integrated as a genuine sensing layer for water/streetlight status — deployed specifically to work around the hackathon venue's own network restrictions, cross-checked against citizen complaints through a clean Device Abstraction Layer (`dal.read()` / `dal.write()`), so swapping in a production board later requires touching exactly one file.
+
+### 🔒 Security and Privacy Were Not an Afterthought
+
+PII masking (Aadhaar/PAN numbers reduced to their last 4 digits) is enforced **inside the vision pipeline itself**, before anything is ever persisted or logged — and the scheme chatbot's topic gate runs as a **code-level check before any model call**, not as a hopeful line in a system prompt. Both are backed by automated tests, built within the same 24 hours.
+
+---
+
+**The headline:** in a single hackathon day, the team shipped a working orchestration engine, an offline voice pipeline, two coordinated backends, a WhatsApp automation layer, a tested and deployed mobile app, and real hardware integration — with security and privacy engineered in from the start, not patched on afterward.
+
 ---
 ## The Business Model
 
