@@ -32,6 +32,19 @@ This isn't a hackathon toy — it's designed as a real deployment path for India
 
 ---
 
+<div align="center">
+  <img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/Screenshot%202026-07-12%20at%201.30.19%E2%80%AFPM.png?alt=media&token=743f4a4f-7db0-4e26-9892-72f9dfad35ca" width="150"/>
+  <img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/Screenshot%202026-07-12%20at%201.30.24%E2%80%AFPM.png?alt=media&token=243538a9-2bcd-46b7-9cfb-cb7ff04e4453" width="150"/>
+  <img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/Screenshot%202026-07-12%20at%201.30.24%E2%80%AFPM.png?alt=media&token=243538a9-2bcd-46b7-9cfb-cb7ff04e4453" width="150"/>
+  <img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/Screenshot%202026-07-12%20at%201.30.29%E2%80%AFPM.png?alt=media&token=83b63a3f-51a5-4e64-b7ac-670d56879be6" width="150"/>
+  <img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/Screenshot%202026-07-12%20at%201.30.41%E2%80%AFPM.png?alt=media&token=cd656923-8d17-4650-ae2a-a3ffb46142ec" width="150"/>
+  <img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/Screenshot%202026-07-12%20at%201.30.47%E2%80%AFPM.png?alt=media&token=ef499ea4-24cc-43a2-9592-023d0c6d6f3c" width="150"/>
+</div>
+
+<div align="center">
+            <img src="https://firebasestorage.googleapis.com/v0/b/kaniyur-start-rgl5rk.firebasestorage.app/o/WhatsApp%20Image%202026-07-12%20at%2013.40.43.jpeg?alt=media&token=2c0b31ec-5783-40aa-861b-543cf352255b" width="900"/>
+</div>
+
 ## How It Works
 
 ```
